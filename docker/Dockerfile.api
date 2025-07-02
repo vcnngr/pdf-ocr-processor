@@ -1,0 +1,43 @@
+FROM ubuntu:22.04
+
+ENV DEBIAN_FRONTEND=noninteractive
+
+# Installa Docker CLI per chiamare il processore
+RUN apt-get update && apt-get install -y \
+    python3 \
+    python3-pip \
+    docker.io \
+    curl \
+    && rm -rf /var/lib/apt/lists/*
+
+# Copia requirements e installa dipendenze Python per API
+COPY requirements.txt /app/
+RUN pip3 install --no-cache-dir -r /app/requirements.txt
+
+# Crea utente non-root
+RUN useradd -m -u 1000 apiuser
+
+# Crea directory di lavoro
+WORKDIR /app
+RUN mkdir -p /tmp/pdf_processor
+RUN chown -R apiuser:apiuser /app /tmp/pdf_processor
+
+# Copia API
+COPY api_wrapper.py /app/
+COPY start_api.sh /app/
+
+# Rende eseguibili
+RUN chmod +x /app/start_api.sh
+
+# Cambia utente
+USER apiuser
+
+# Espone porta API
+EXPOSE 5000
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
+    CMD curl -f http://localhost:5000/health || exit 1
+
+# Comando di avvio
+CMD ["/app/start_api.sh"]

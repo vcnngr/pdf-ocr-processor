@@ -1,0 +1,39 @@
+# PDF OCR Processor - Python Dependencies
+# Pinned versions for reproducible builds
+
+# Core PDF processing
+PyPDF2==3.0.1
+pdf2image==1.16.3
+pytesseract==0.3.10
+
+# Image processing
+Pillow==10.2.0
+
+# API REST
+Flask==3.0.0
+Werkzeug==3.0.1
+gunicorn==21.2.0
+
+# File handling
+python-magic==0.4.27
+
+# PDF manipulation
+reportlab==4.0.9
+
+# HTTP requests for examples
+requests==2.31.0
+
+# Logging and utilities
+python-dotenv==1.0.0
+
+# Development and testing (optional)
+pytest==7.4.4
+pytest-cov==4.1.0
+black==23.12.1
+flake8==7.0.0
+
+# Performance monitoring (optional)
+psutil==5.9.7
+
+# Additional utilities
+pathlib2==2.3.7; python_version < "3.4"

@@ -1,0 +1,137 @@
+services:
+  # Processore PDF base
+  pdf-ocr-processor:
+    build: 
+      context: .
+      dockerfile: Dockerfile
+    image: pdf-ocr-processor:latest
+    container_name: pdf-processor
+    volumes:
+      - ./input:/app/input:ro
+      - ./output:/app/output
+      - ./temp:/app/temp
+    environment:
+      - DEBIAN_FRONTEND=noninteractive
+      - TESSDATA_PREFIX=/usr/share/tesseract-ocr/4.00/tessdata
+    working_dir: /app
+    deploy:
+      resources:
+        limits:
+          memory: 2G
+          cpus: '2.0'
+    profiles:
+      - manual
+
+  # API REST per integrazione automatica
+  pdf-api:
+    build:
+      context: .
+      dockerfile: Dockerfile.api
+    image: pdf-ocr-api:latest
+    container_name: pdf-api
+    ports:
+      - "5000:5000"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - ./api_temp:/tmp/pdf_processor
+    environment:
+      - WORKERS=2
+      - WORKER_TIMEOUT=600
+      - MAX_REQUESTS=100
+    depends_on:
+      - pdf-ocr-processor
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    profiles:
+      - api
+
+  # Processore batch
+  pdf-batch-processor:
+    extends: pdf-ocr-processor
+    volumes:
+      - ./batch_input:/app/input:ro
+      - ./batch_output:/app/output
+      - ./temp:/app/temp
+    command: |
+      bash -c "
+        echo 'Avvio elaborazione batch...'
+        processed=0
+        for file in /app/input/*.pdf; do
+          if [ -f \"$file\" ]; then
+            filename=$(basename \"$file\")
+            echo \"[$((++processed))] Processing: $filename\"
+            start_time=$(date +%s)
+            
+            if python3 /app/pdf_processor.py \"$file\" \"/app/output/${filename%%.pdf}_ocr.pdf\"; then
+              end_time=$(date +%s)
+              duration=$((end_time - start_time))
+              echo \"✓ Completato in ${duration}s\"
+            else
+              echo \"✗ Errore nell'elaborazione di $filename\"
+            fi
+          fi
+        done
+        echo \"Elaborazione batch completata: $processed file processati\"
+      "
+    profiles:
+      - batch
+
+  # Monitoraggio sistema
+  pdf-monitor:
+    image: alpine:latest
+    volumes:
+      - ./temp:/monitor/temp:ro
+      - ./output:/monitor/output:ro
+      - ./api_temp:/monitor/api_temp:ro
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    command: |
+      sh -c "
+        apk add --no-cache docker-cli curl
+        while true; do
+          clear
+          echo \"=== PDF OCR Processor Monitor ===\"
+          echo \"Timestamp: $(date)\"
+          echo
+          echo \"📁 File System:\"
+          echo \"  File temporanei: $(find /monitor/temp -type f 2>/dev/null | wc -l)\"
+          echo \"  File output: $(find /monitor/output -name '*.pdf' 2>/dev/null | wc -l)\"
+          echo \"  API temp: $(find /monitor/api_temp -type f 2>/dev/null | wc -l)\"
+          echo \"  Spazio temp: $(du -sh /monitor/temp 2>/dev/null | cut -f1 || echo '0')\"
+          echo
+          echo \"🐳 Docker Containers:\"
+          docker ps --format 'table {{.Names}}\t{{.Status}}\t{{.Ports}}' --filter label=com.docker.compose.project
+          echo
+          echo \"💾 System Resources:\"
+          echo \"  Memory: $(free -h | awk '/^Mem:/ {print \$3\"/\"\$2}')\"
+          echo \"  Disk: $(df -h / | awk 'NR==2 {print \$3\"/\"\$2 \" (\" \$5 \" used)\"}')\"
+          echo
+          if docker ps | grep -q pdf-api; then
+            echo \"🌐 API Status:\"
+            if curl -s http://pdf-api:5000/health >/dev/null 2>&1; then
+              echo \"  ✓ API Online\"
+              curl -s http://pdf-api:5000/health | grep -o '\"active_jobs\":[0-9]*' | cut -d: -f2 | xargs -I {} echo \"  Active jobs: {}\"
+            else
+              echo \"  ✗ API Offline\"
+            fi
+          fi
+          sleep 30
+        done
+      "
+    profiles:
+      - monitor
+
+  # Gateway Nginx per load balancing (opzionale)
+  pdf-gateway:
+    image: nginx:alpine
+    ports:
+      - "80:80"
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+    depends_on:
+      - pdf-api
+    profiles:
+      - gateway
