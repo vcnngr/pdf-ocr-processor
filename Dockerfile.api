@@ -23,8 +23,8 @@ RUN mkdir -p /tmp/pdf_processor
 RUN chown -R apiuser:apiuser /app /tmp/pdf_processor
 
 # Copia API
-COPY api_wrapper.py /app/
-COPY start_api.sh /app/
+COPY scripts/api_wrapper.py /app/
+COPY scripts/start_api.sh /app/
 
 # Rende eseguibili
 RUN chmod +x /app/start_api.sh

@@ -29,8 +29,8 @@ RUN pip3 install --no-cache-dir -r /app/requirements.txt
 WORKDIR /app
 
 # Copia lo script principale
-COPY pdf_processor.py /app/
-COPY process_pdf.sh /app/
+COPY scripts/pdf_processor.py /app/
+COPY scripts/process_pdf.sh /app/
 
 # Rende eseguibili gli script
 RUN chmod +x /app/process_pdf.sh
