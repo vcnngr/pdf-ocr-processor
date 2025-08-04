@@ -1,0 +1,47 @@
+# .dockerignore - File da escludere dal build context
+
+# File di output e temporanei
+input/*.pdf
+output/*.pdf
+batch_input/*.pdf
+batch_output/*.pdf
+temp/*
+api_temp/*
+logs/*.log
+backups/*.tar.gz
+
+# Virtual environments
+venv/
+env/
+__pycache__/
+*.pyc
+*.pyo
+
+# Development files
+.git/
+.gitignore
+*.md
+!README.md
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+
+# Test files
+tests/temp/
+tests/output/
+
+# Non includere altri Dockerfile
+Dockerfile.*
+!Dockerfile
+!Dockerfile.api
+
+# Non servono nel container
+.env*
+docker-compose*.yml
+Makefile
+setup.sh
